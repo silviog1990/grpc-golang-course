@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 
@@ -15,6 +16,23 @@ func main() {
 		log.Fatalf("could not connect to: %v", err)
 	}
 	defer cc.Close()
-	greetpb.NewGreetServiceClient(cc)
-	fmt.Println("Created client")
+	c := greetpb.NewGreetServiceClient(cc)
+	doUnary(c)
+}
+
+func doUnary(c greetpb.GreetServiceClient) {
+	fmt.Println("Start unary invocation")
+
+	req := &greetpb.GreetRequest{
+		Greeting: &greetpb.Greeting{
+			FirstName: "Silvio",
+			LastName:  "Gay",
+		},
+	}
+
+	res, err := c.Greet(context.Background(), req)
+	if err != nil {
+		log.Fatalf("error while calling Greet RPC: %v", err)
+	}
+	fmt.Printf("Response from Greet: %v\n", res.GetResult())
 }

@@ -14,23 +14,18 @@ type server struct{}
 func (*server) PrimeNumberDecomposition(req *primenumberpb.PrimeNumberRequest, stream primenumberpb.PrimeNumberService_PrimeNumberDecompositionServer) error {
 	fmt.Println("PrimeNumberDecomposition called")
 	n := req.Num
-	var k int32 = 2
-	for {
-		// fmt.Printf("n: %v, k: %v\n", n, k)
-		if n > 1 {
-			if n%k == 0 {
-				n = n / k
-				res := &primenumberpb.PrimeNumberResponse{
-					Result: k,
-				}
-				stream.Send(res)
-			} else {
-				k = k + 1
+	// var k int32 = 2
+	k := int32(2)
+	for n > 1 {
+		if n%k == 0 {
+			n = n / k
+			res := &primenumberpb.PrimeNumberResponse{
+				Result: k,
 			}
+			stream.Send(res)
 		} else {
-			break
+			k = k + 1
 		}
-		// time.Sleep(1000 * time.Millisecond)
 	}
 	return nil
 }

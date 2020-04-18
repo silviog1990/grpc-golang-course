@@ -6,9 +6,8 @@ import (
 	"log"
 	"net"
 
+	"github.com/silviog1990/grpc-golang-course/unary/sum/sumpb"
 	"google.golang.org/grpc"
-
-	"github.com/silviog1990/grpc-sum/sumpb"
 )
 
 type server struct{}

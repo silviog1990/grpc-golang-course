@@ -6,8 +6,9 @@ import (
 	"log"
 	"net"
 
-	"github.com/silviog1990/grpc-course/greet/greetpb"
+	"github.com/silviog1990/grpc-golang-course/unary/greeting/greetpb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type server struct{}
@@ -33,6 +34,8 @@ func main() {
 	s := grpc.NewServer()
 	fmt.Println("Server listen to:", serverIP)
 	greetpb.RegisterGreetServiceServer(s, &server{})
+
+	reflection.Register(s)
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)

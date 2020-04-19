@@ -7,22 +7,84 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/silviog1990/grpc-golang-course/blog-mongo/blogpb"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 )
 
 type server struct{}
 
+type blogItem struct {
+	ID      primitive.ObjectID `bson:"_id,omitempty"`
+	Author  string             `bson:"author"`
+	Title   string             `bson:"title"`
+	Content string             `bson:"content"`
+}
+
+func (data *blogItem) transformToBlog() *blogpb.Blog {
+	if !data.ID.IsZero() {
+		return &blogpb.Blog{
+			Id:      data.ID.Hex(),
+			Author:  data.Author,
+			Title:   data.Title,
+			Content: data.Title,
+		}
+	}
+	return &blogpb.Blog{
+		Author:  data.Author,
+		Title:   data.Title,
+		Content: data.Title,
+	}
+}
+
+func (data *blogItem) transformFromBlog(blog *blogpb.Blog) *blogItem {
+	return &blogItem{
+		Author:  blog.Author,
+		Title:   blog.Title,
+		Content: blog.Content,
+	}
+}
+
+var db *mongo.Database
+
 func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*blogpb.CreateBlogResponse, error) {
-	return &blogpb.CreateBlogResponse{}, nil
+	fmt.Println("Create blog invoked")
+	blog := req.GetBlog()
+	if blog == nil {
+		return nil, status.Error(
+			codes.InvalidArgument, "blog nil",
+		)
+	}
+
+	blogItem := &blogItem{}
+	blogItem = blogItem.transformFromBlog(blog)
+
+	collection := db.Collection("blogs")
+	res, err := collection.InsertOne(ctx, blogItem)
+	if err != nil {
+		return nil, err
+	}
+	blog.Id = res.InsertedID.(primitive.ObjectID).Hex()
+	return &blogpb.CreateBlogResponse{Blog: blog}, nil
 }
 
 func main() {
 	// if we crash the go code, we get the file name and line number
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	// connection with mongodb
+	fmt.Println("Connecting to database...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	clientDB, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://mongoadmin:passwordMongo2020@localhost:27017"))
+	db = clientDB.Database("grpc_course")
 	fmt.Println("Start inizialization of server")
 
 	serverIP := "0.0.0.0:50051"
@@ -50,6 +112,11 @@ func main() {
 
 	// Block until a signal is received
 	<-ch
+
+	fmt.Println("Closing mongodb collection")
+	if err := clientDB.Disconnect(ctx); err != nil {
+		log.Fatalf("error on disconnect with mongodb: %v", err)
+	}
 
 	fmt.Println("Closing the listener")
 	if err := lis.Close(); err != nil {

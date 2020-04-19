@@ -16,7 +16,17 @@ message GreetResponse {
   string result = 1;
 }
 
+message GreetWithDeadlineRequest {
+  Greeting greeting = 1;
+}
+
+message GreetWithDeadlineResponse {
+  string result = 1;
+}
+
 service GreetService {
   // unary
   rpc Greet (GreetRequest) returns (GreetResponse) {};
+  // unary rpc with deadline time
+  rpc GreetWithDeadline (GreetWithDeadlineRequest) returns (GreetWithDeadlineResponse) {};
 }

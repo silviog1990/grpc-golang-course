@@ -7,6 +7,8 @@ import (
 
 	"github.com/silviog1990/grpc-golang-course/blog-mongo/blogpb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -19,6 +21,7 @@ func main() {
 
 	client := blogpb.NewBlogServiceClient(cc)
 	createBlog(client)
+	readBlog(client, "5e9cc96900733582dac66aed")
 }
 
 func createBlog(client blogpb.BlogServiceClient) {
@@ -34,4 +37,22 @@ func createBlog(client blogpb.BlogServiceClient) {
 		log.Fatalf("Error while calling CreateBlog: %v", err)
 	}
 	fmt.Printf("Blog created: %v\n", res)
+}
+
+//5e9cc96900733582dac66aed
+func readBlog(client blogpb.BlogServiceClient, id string) {
+	fmt.Println("read blog api invoked")
+	res, err := client.ReadBlog(context.Background(), &blogpb.ReadBlogRequest{
+		Id: id,
+	})
+	if err != nil {
+		statusErr, ok := status.FromError(err)
+		if ok && statusErr.Code() == codes.NotFound {
+			fmt.Printf("Blog with id: %v not found\n", id)
+		} else {
+			log.Fatalf("Error while calling ReadBlog: %v", err)
+		}
+		return
+	}
+	fmt.Printf("Blog found: %v\n", res)
 }

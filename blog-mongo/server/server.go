@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/silviog1990/grpc-golang-course/blog-mongo/blogpb"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -53,6 +54,7 @@ func (data *blogItem) transformFromBlog(blog *blogpb.Blog) *blogItem {
 }
 
 var db *mongo.Database
+var blogCollection *mongo.Collection
 
 func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*blogpb.CreateBlogResponse, error) {
 	fmt.Println("Create blog invoked")
@@ -66,13 +68,39 @@ func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*
 	blogItem := &blogItem{}
 	blogItem = blogItem.transformFromBlog(blog)
 
-	collection := db.Collection("blogs")
-	res, err := collection.InsertOne(ctx, blogItem)
+	res, err := blogCollection.InsertOne(ctx, blogItem)
 	if err != nil {
 		return nil, err
 	}
 	blog.Id = res.InsertedID.(primitive.ObjectID).Hex()
 	return &blogpb.CreateBlogResponse{Blog: blog}, nil
+}
+
+func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blogpb.ReadBlogResponse, error) {
+	fmt.Println("ReadBlog invoked")
+	blogID := req.Id
+	primitiveBlogID, err := primitive.ObjectIDFromHex(blogID)
+	if err != nil {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			fmt.Sprintf("Cannot parse passed id: %v", blogID),
+		)
+	}
+
+	data := &blogItem{}
+	filter := bson.M{"_id": primitiveBlogID}
+
+	blogFound := blogCollection.FindOne(ctx, filter)
+	if err := blogFound.Decode(data); err != nil {
+		return nil, status.Error(
+			codes.NotFound,
+			fmt.Sprintf("Blog not found with id: %v", blogID),
+		)
+	}
+	blogRes := data.transformToBlog()
+	return &blogpb.ReadBlogResponse{
+		Blog: blogRes,
+	}, nil
 }
 
 func main() {
@@ -85,6 +113,7 @@ func main() {
 	defer cancel()
 	clientDB, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://mongoadmin:passwordMongo2020@localhost:27017"))
 	db = clientDB.Database("grpc_course")
+	blogCollection = db.Collection("blogs")
 	fmt.Println("Start inizialization of server")
 
 	serverIP := "0.0.0.0:50051"
@@ -113,7 +142,7 @@ func main() {
 	// Block until a signal is received
 	<-ch
 
-	fmt.Println("Closing mongodb collection")
+	fmt.Println("Closing mongodb connection")
 	if err := clientDB.Disconnect(ctx); err != nil {
 		log.Fatalf("error on disconnect with mongodb: %v", err)
 	}

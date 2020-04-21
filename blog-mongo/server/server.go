@@ -45,19 +45,34 @@ func (data *blogItem) transformToBlog() *blogpb.Blog {
 	}
 }
 
-func (data *blogItem) transformFromBlog(blog *blogpb.Blog) *blogItem {
+func (data *blogItem) transformFromBlog(blog *blogpb.Blog) (*blogItem, error) {
+	if len(blog.Id) > 0 {
+		primitiveBlogID, err := primitive.ObjectIDFromHex(blog.Id)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.InvalidArgument,
+				fmt.Sprintf("Cannot parse passed id: %v", blog.Id),
+			)
+		}
+		return &blogItem{
+			ID:      primitiveBlogID,
+			Author:  blog.Author,
+			Title:   blog.Title,
+			Content: blog.Content,
+		}, nil
+	}
 	return &blogItem{
 		Author:  blog.Author,
 		Title:   blog.Title,
 		Content: blog.Content,
-	}
+	}, nil
 }
 
 var db *mongo.Database
 var blogCollection *mongo.Collection
 
 func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*blogpb.CreateBlogResponse, error) {
-	fmt.Println("Create blog invoked")
+	fmt.Println("CreateBlog was invoked")
 	blog := req.GetBlog()
 	if blog == nil {
 		return nil, status.Error(
@@ -66,7 +81,7 @@ func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*
 	}
 
 	blogItem := &blogItem{}
-	blogItem = blogItem.transformFromBlog(blog)
+	blogItem, _ = blogItem.transformFromBlog(blog)
 
 	res, err := blogCollection.InsertOne(ctx, blogItem)
 	if err != nil {
@@ -77,7 +92,7 @@ func (*server) CreateBlog(ctx context.Context, req *blogpb.CreateBlogRequest) (*
 }
 
 func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blogpb.ReadBlogResponse, error) {
-	fmt.Println("ReadBlog invoked")
+	fmt.Println("ReadBlog was invoked")
 	blogID := req.Id
 	primitiveBlogID, err := primitive.ObjectIDFromHex(blogID)
 	if err != nil {
@@ -101,6 +116,75 @@ func (*server) ReadBlog(ctx context.Context, req *blogpb.ReadBlogRequest) (*blog
 	return &blogpb.ReadBlogResponse{
 		Blog: blogRes,
 	}, nil
+}
+
+func (*server) UpdateBlog(ctx context.Context, req *blogpb.UpdateBlogRequest) (*blogpb.UpdateBlogResponse, error) {
+	fmt.Println("UpdateBlog was invoked")
+	blog := req.GetBlog()
+	if blog == nil {
+		return nil, status.Error(
+			codes.InvalidArgument, "blog nil",
+		)
+	}
+
+	blogItem := &blogItem{}
+	blogItem, err := blogItem.transformFromBlog(blog)
+	if err != nil {
+		stErr, ok := status.FromError(err)
+		if ok && stErr.Code() == codes.InvalidArgument {
+			return nil, err
+		}
+		return nil, status.Error(
+			codes.Internal,
+			fmt.Sprintf("unexpected error: %v", err),
+		)
+
+	}
+
+	filter := bson.M{"_id": blogItem.ID}
+
+	_, err = blogCollection.ReplaceOne(ctx, filter, blogItem)
+	if err != nil {
+		return nil, status.Error(
+			codes.Internal,
+			fmt.Sprintf("internal error: %v", err),
+		)
+	}
+
+	return &blogpb.UpdateBlogResponse{Blog: blog}, nil
+}
+func (*server) DeleteBlog(ctx context.Context, req *blogpb.DeleteBlogRequest) (*blogpb.DeleteBlogResponse, error) {
+	fmt.Println("DeleteBlog was invoked")
+	blogID := req.GetId()
+	if len(blogID) == 0 {
+		return nil, status.Error(
+			codes.InvalidArgument, "blogID empty",
+		)
+	}
+
+	oid, _ := primitive.ObjectIDFromHex(blogID)
+
+	filter := bson.M{"_id": oid}
+
+	data := &blogItem{}
+	blogFound := blogCollection.FindOne(ctx, filter)
+	if err := blogFound.Decode(data); err != nil {
+		return nil, status.Error(
+			codes.NotFound,
+			fmt.Sprintf("Blog not found with id: %v", blogID),
+		)
+	}
+	blogRes := data.transformToBlog()
+
+	_, err := blogCollection.DeleteOne(ctx, filter)
+	if err != nil {
+		return nil, status.Error(
+			codes.Internal,
+			fmt.Sprintf("internal error: %v", err),
+		)
+	}
+
+	return &blogpb.DeleteBlogResponse{Blog: blogRes}, nil
 }
 
 func main() {

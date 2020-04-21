@@ -50,7 +50,7 @@ message ListBlogsResponse{
 service BlogService {
     rpc CreateBlog (CreateBlogRequest) returns (CreateBlogResponse);
     rpc ReadBlog (ReadBlogRequest) returns (ReadBlogResponse);
-    // rpc UpdateBlog (UpdateBlogRequest) returns (UpdateBlogResponse);
-    // rpc DeleteBlog (DeleteBlogRequest) returns (DeleteBlogResponse);
+    rpc UpdateBlog (UpdateBlogRequest) returns (UpdateBlogResponse);
+    rpc DeleteBlog (DeleteBlogRequest) returns (DeleteBlogResponse);
     // rpc ListBlogs (ListBlogsRequest) returns (stream ListBlogsResponse);
 }

@@ -19,27 +19,33 @@ func main() {
 	}
 	defer cc.Close()
 
+	blog := &blogpb.Blog{
+		Author:  "Silvio",
+		Title:   "grpc tutorial",
+		Content: "this is grpc tutorial with golang and mongodb",
+	}
+
 	client := blogpb.NewBlogServiceClient(cc)
-	createBlog(client)
-	readBlog(client, "5e9cc96900733582dac66aed")
+	blog, _ = createBlog(client, blog)
+	readBlog(client, blog.Id)
+	updateBlog(client, blog)
+	deleteBlog(client, blog.Id)
+	readBlog(client, blog.Id)
 }
 
-func createBlog(client blogpb.BlogServiceClient) {
+func createBlog(client blogpb.BlogServiceClient, blog *blogpb.Blog) (*blogpb.Blog, error) {
 	fmt.Println("create blog api invoked")
 	res, err := client.CreateBlog(context.Background(), &blogpb.CreateBlogRequest{
-		Blog: &blogpb.Blog{
-			Author:  "Silvio",
-			Title:   "grpc tutorial",
-			Content: "this is grpc tutorial with golang and mongodb",
-		},
+		Blog: blog,
 	})
 	if err != nil {
 		log.Fatalf("Error while calling CreateBlog: %v", err)
+		return nil, err
 	}
 	fmt.Printf("Blog created: %v\n", res)
+	return res.Blog, nil
 }
 
-//5e9cc96900733582dac66aed
 func readBlog(client blogpb.BlogServiceClient, id string) {
 	fmt.Println("read blog api invoked")
 	res, err := client.ReadBlog(context.Background(), &blogpb.ReadBlogRequest{
@@ -55,4 +61,34 @@ func readBlog(client blogpb.BlogServiceClient, id string) {
 		return
 	}
 	fmt.Printf("Blog found: %v\n", res)
+}
+
+func updateBlog(client blogpb.BlogServiceClient, blog *blogpb.Blog) {
+	fmt.Println("update blog api invoked")
+	blog.Title += " MODIFIED"
+	blog.Content += " MODIFIED"
+	res, err := client.UpdateBlog(context.Background(), &blogpb.UpdateBlogRequest{
+		Blog: blog,
+	})
+	if err != nil {
+		log.Fatalf("Error while calling UpdateBlog: %v", err)
+	}
+	fmt.Printf("Blog created: %v\n", res)
+}
+
+func deleteBlog(client blogpb.BlogServiceClient, id string) {
+	fmt.Println("delete blog api invoked")
+	res, err := client.DeleteBlog(context.Background(), &blogpb.DeleteBlogRequest{
+		Id: id,
+	})
+	if err != nil {
+		statusErr, ok := status.FromError(err)
+		if ok && statusErr.Code() == codes.NotFound {
+			fmt.Printf("Blog with id: %v not found\n", id)
+		} else {
+			log.Fatalf("Error while calling ReadBlog: %v", err)
+		}
+		return
+	}
+	fmt.Printf("Blog deleted: %v\n", res)
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 
 	"github.com/silviog1990/grpc-golang-course/blog-mongo/blogpb"
@@ -19,18 +20,19 @@ func main() {
 	}
 	defer cc.Close()
 
-	blog := &blogpb.Blog{
+	blogInput := &blogpb.Blog{
 		Author:  "Silvio",
 		Title:   "grpc tutorial",
 		Content: "this is grpc tutorial with golang and mongodb",
 	}
 
 	client := blogpb.NewBlogServiceClient(cc)
-	blog, _ = createBlog(client, blog)
+	blog, _ := createBlog(client, blogInput)
 	readBlog(client, blog.Id)
 	updateBlog(client, blog)
 	deleteBlog(client, blog.Id)
 	readBlog(client, blog.Id)
+	listBlogs(client)
 }
 
 func createBlog(client blogpb.BlogServiceClient, blog *blogpb.Blog) (*blogpb.Blog, error) {
@@ -91,4 +93,22 @@ func deleteBlog(client blogpb.BlogServiceClient, id string) {
 		return
 	}
 	fmt.Printf("Blog deleted: %v\n", res)
+}
+
+func listBlogs(client blogpb.BlogServiceClient) {
+	fmt.Println("list blogs api invoked")
+	stream, err := client.ListBlogs(context.Background(), &blogpb.ListBlogsRequest{})
+	if err != nil {
+		log.Fatalf("error while calling ListBlogs RPC: %v", err)
+	}
+	for {
+		res, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatalf("Something happened: %v", err)
+		}
+		fmt.Println(res.GetBlog())
+	}
 }

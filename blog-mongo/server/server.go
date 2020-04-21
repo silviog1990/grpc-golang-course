@@ -186,6 +186,38 @@ func (*server) DeleteBlog(ctx context.Context, req *blogpb.DeleteBlogRequest) (*
 
 	return &blogpb.DeleteBlogResponse{Blog: blogRes}, nil
 }
+func (*server) ListBlogs(req *blogpb.ListBlogsRequest, stream blogpb.BlogService_ListBlogsServer) error {
+	fmt.Println("ListBlogs was invoked")
+
+	cur, err := blogCollection.Find(context.Background(), primitive.D{{}})
+	if err != nil {
+		return status.Error(
+			codes.Internal,
+			fmt.Sprintf("Unknown internal error: %v", err),
+		)
+	}
+	defer cur.Close(context.Background())
+	for cur.Next(context.Background()) {
+		data := &blogItem{}
+		err := cur.Decode(data)
+		if err != nil {
+			return status.Error(
+				codes.Internal,
+				fmt.Sprintf("Error while decoding data from MongoDB: %v", err),
+			)
+
+		}
+		blog := data.transformToBlog()
+		stream.Send(&blogpb.ListBlogsResponse{Blog: blog})
+	}
+	if err := cur.Err(); err != nil {
+		return status.Error(
+			codes.Internal,
+			fmt.Sprintf("Unknown internal error: %v", err),
+		)
+	}
+	return nil
+}
 
 func main() {
 	// if we crash the go code, we get the file name and line number

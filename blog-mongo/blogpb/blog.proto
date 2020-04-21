@@ -52,5 +52,5 @@ service BlogService {
     rpc ReadBlog (ReadBlogRequest) returns (ReadBlogResponse);
     rpc UpdateBlog (UpdateBlogRequest) returns (UpdateBlogResponse);
     rpc DeleteBlog (DeleteBlogRequest) returns (DeleteBlogResponse);
-    // rpc ListBlogs (ListBlogsRequest) returns (stream ListBlogsResponse);
+    rpc ListBlogs (ListBlogsRequest) returns (stream ListBlogsResponse);
 }
